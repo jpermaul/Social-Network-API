@@ -1,38 +1,14 @@
 const { ObjectId } = require('mongoose').Types;
-const { user, thought } = require('../models');
-
-// Aggregate function to get the number of users overall
-const headCount = async () => {
-  const numberOfusers = await user.aggregate()
-    .count('userCount');
-  return numberOfusers;
-}
-
-// Aggregate function for getting the overall grade using $avg
-const grade = async (userId) =>
-  user.aggregate([
-    // only include the given user by using $match
-    { $match: { _id: new ObjectId(userId) } },
-    {
-      $unwind: '$assignments',
-    },
-    {
-      $group: {
-        _id: new ObjectId(userId),
-        overallGrade: { $avg: '$assignments.score' },
-      },
-    },
-  ]);
+const { User, Thought } = require('../models');
 
 module.exports = {
   // Get all users
-  async getusers(req, res) {
+  async getUsers(req, res) {
     try {
-      const users = await user.find();
+      const users = await User.find();
 
       const userObj = {
         users,
-        headCount: await headCount(),
       };
 
       res.json(userObj);
@@ -42,9 +18,9 @@ module.exports = {
     }
   },
   // Get a single user
-  async getSingleuser(req, res) {
+  async getSingleUser(req, res) {
     try {
-      const user = await user.findOne({ _id: req.params.userId })
+      const user = await User.findOne({ _id: req.params.userId })
         .select('-__v');
 
       if (!user) {
@@ -53,7 +29,6 @@ module.exports = {
 
       res.json({
         user,
-        grade: await grade(req.params.userId),
       });
     } catch (err) {
       console.log(err);
@@ -61,24 +36,24 @@ module.exports = {
     }
   },
   // create a new user
-  async createuser(req, res) {
+  async createUser(req, res) {
     try {
-      const user = await user.create(req.body);
+      const user = await User.create(req.body);
       res.json(user);
     } catch (err) {
       res.status(500).json(err);
     }
   },
   // Delete a user and remove them from the thought
-  async deleteuser(req, res) {
+  async deleteUser(req, res) {
     try {
-      const user = await user.findOneAndRemove({ _id: req.params.userId });
+      const user = await User.findOneAndRemove({ _id: req.params.userId });
 
       if (!user) {
         return res.status(404).json({ message: 'No such user exists' });
       }
 
-      const thought = await thought.findOneAndUpdate(
+      const thought = await Thought.findOneAndUpdate(
         { users: req.params.userId },
         { $pull: { users: req.params.userId } },
         { new: true }
@@ -96,16 +71,34 @@ module.exports = {
       res.status(500).json(err);
     }
   },
+  async updateUser(req, res) {
+    try {
+      const user = await User.findOneAndUpdate(
+        { _id: req.params.userId },
+        { $set: req.body },
+        { runValidators: true, new: true }
+      );
 
-  // Add an assignment to a user
-  async addAssignment(req, res) {
-    console.log('You are adding an assignment');
+      if (!user) {
+        res.status(404).json({ message: 'No user with this id!' });
+      }
+
+      res.json(user);
+    } catch (err) {
+      res.status(500).json(err);
+    }
+  },
+
+
+  // Add an friend to a user
+  async addFriend(req, res) {
+    console.log('You are adding an friend');
     console.log(req.body);
 
     try {
-      const user = await user.findOneAndUpdate(
+      const user = await User.findOneAndUpdate(
         { _id: req.params.userId },
-        { $addToSet: { assignments: req.body } },
+        { $addToSet: { friends: req.params.friendId } },
         { runValidators: true, new: true }
       );
 
@@ -120,12 +113,12 @@ module.exports = {
       res.status(500).json(err);
     }
   },
-  // Remove assignment from a user
-  async removeAssignment(req, res) {
+  // Remove friend from a user
+  async removeFriend(req, res) {
     try {
-      const user = await user.findOneAndUpdate(
+      const user = await User.findOneAndUpdate(
         { _id: req.params.userId },
-        { $pull: { assignment: { assignmentId: req.params.assignmentId } } },
+        { $pull: { friends: req.params.friendId } },
         { runValidators: true, new: true }
       );
 
